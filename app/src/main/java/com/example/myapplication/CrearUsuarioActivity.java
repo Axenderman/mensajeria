@@ -15,6 +15,8 @@ import com.google.firebase.auth.AuthResult;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseAuthUserCollisionException;
 import com.google.firebase.auth.FirebaseUser;
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
 
 public class CrearUsuarioActivity extends AppCompatActivity {
 
@@ -25,6 +27,7 @@ public class CrearUsuarioActivity extends AppCompatActivity {
     private EditText editTextConfirmPassword;
 
     private FirebaseAuth mAuth;
+    private DatabaseReference mDatabase;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -32,6 +35,7 @@ public class CrearUsuarioActivity extends AppCompatActivity {
         setContentView(R.layout.activity_crear_usuario);
 
         mAuth = FirebaseAuth.getInstance();
+        mDatabase = FirebaseDatabase.getInstance().getReference();
 
         editTextEmail = findViewById(R.id.editTextEmail);
         editTextPassword = findViewById(R.id.editTextPassword);
@@ -62,6 +66,10 @@ public class CrearUsuarioActivity extends AppCompatActivity {
                 .addOnCompleteListener(this, task -> {
                     if (task.isSuccessful()) {
                         Log.d(TAG, "createUserWithEmail:success");
+                        FirebaseUser user = mAuth.getCurrentUser();
+                        if (user != null) {
+                            saveUserRole(user.getUid(), email);
+                        }
                         sendVerificationEmail();
                     } else {
                         if (task.getException() instanceof FirebaseAuthUserCollisionException) {
@@ -73,6 +81,14 @@ public class CrearUsuarioActivity extends AppCompatActivity {
                         }
                     }
                 });
+    }
+
+    private void saveUserRole(String userId, String email) {
+        String role = "Usuario";
+        if (email.equals("axelalejandro.flores26@gmail.com")) {
+            role = "Admin";
+        }
+        mDatabase.child("users").child(userId).child("role").setValue(role);
     }
 
     private void signInAndSendVerification(String email, String password) {

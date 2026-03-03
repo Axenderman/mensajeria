@@ -1,17 +1,12 @@
 <resources>
     <string name="app_name">My Application</string>
-    <string name="bienvenido">Welcome</string>
     <string name="iniciar_sesion">Sign In</string>
     <string name="crear_usuario">Create Account</string>
     <string name="cerrar_sesion">Sign Out</string>
+    <string name="bienvenido">Welcome</string>
     <string name="correo_electronico">Email</string>
     <string name="contrasena">Password</string>
     <string name="confirmar_contrasena">Confirm Password</string>
     <string name="cambiar_a_espanol">Spanish</string>
     <string name="cambiar_a_ingles">English</string>
-    <string name="roles_de_usuario">User Roles</string>
-    <string name="chat">Chat</string>
-    <string name="video_llamada">Video Call</string>
-    <string name="send_button_text">Send</string>
-    <string name="message_hint">Write a message</string>
 </resources>

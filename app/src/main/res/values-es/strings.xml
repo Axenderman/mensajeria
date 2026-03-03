@@ -1,0 +1,17 @@
+<resources>
+    <string name="app_name">Mi Aplicación</string>
+    <string name="iniciar_sesion">Iniciar Sesión</string>
+    <string name="crear_usuario">Crear Usuario</string>
+    <string name="cerrar_sesion">Cerrar Sesión</string>
+    <string name="bienvenido">Bienvenido</string>
+    <string name="correo_electronico">Correo Electrónico</string>
+    <string name="contrasena">Contraseña</string>
+    <string name="confirmar_contrasena">Confirmar Contraseña</string>
+    <string name="cambiar_a_espanol">Español</string>
+    <string name="cambiar_a_ingles">Inglés</string>
+    <string name="roles_de_usuario">Roles de usuario</string>
+    <string name="chat">Chat</string>
+    <string name="video_llamada">Video Llamada</string>
+    <string name="send_button_text">Enviar</string>
+    <string name="message_hint">Escribe un mensaje</string>
+</resources>
