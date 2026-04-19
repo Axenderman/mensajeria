@@ -19,7 +19,17 @@ android {
 
     buildTypes {
         release {
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+        }
+        debug {
+            // Desactivamos la minificación en debug para evitar cierres inesperados al testear
             isMinifyEnabled = false
+            isShrinkResources = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -33,7 +43,6 @@ android {
 }
 
 dependencies {
-
     implementation(libs.androidx.appcompat)
     implementation(libs.material)
     implementation(platform("com.google.firebase:firebase-bom:33.1.1"))

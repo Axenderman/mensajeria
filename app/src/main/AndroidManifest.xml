@@ -47,6 +47,10 @@
             android:exported="false"
             android:configChanges="orientation|screenSize|keyboardHidden"/>
 
+        <activity
+            android:name=".UserListActivity"
+            android:exported="false"/>
+
     </application>
 
 </manifest>

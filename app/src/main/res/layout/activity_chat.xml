@@ -6,20 +6,34 @@
     android:padding="16dp"
     tools:context=".ChatActivity">
 
-    <Button
-        android:id="@+id/buttonVideoLlamada"
-        android:layout_width="wrap_content"
+    <LinearLayout
+        android:id="@+id/top_bar"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_alignParentTop="true"
-        android:layout_alignParentEnd="true"
-        android:text="@string/video_llamada" />
+        android:orientation="horizontal"
+        android:layout_alignParentTop="true">
+
+        <Button
+            android:id="@+id/buttonViewUsers"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Usuarios" />
+
+        <Button
+            android:id="@+id/buttonVideoLlamada"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/video_llamada" />
+    </LinearLayout>
 
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/list_of_messages"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:layout_above="@+id/input_layout"
-        android:layout_below="@+id/buttonVideoLlamada" />
+        android:layout_below="@+id/top_bar" />
 
     <LinearLayout
         android:id="@+id/input_layout"

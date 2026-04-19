@@ -1,6 +1,7 @@
 package com.example.myapplication;
 
 import android.Manifest;
+import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
@@ -32,30 +33,39 @@ import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.Query;
 import com.google.firebase.database.ValueEventListener;
 
+import java.util.HashMap;
+import java.util.Map;
+
 public class ChatActivity extends AppCompatActivity {
 
     private static final String TAG = "ChatActivity";
-    private static final int PERMISSION_REQUEST_CODE = 100;
-    
     private FirebaseRecyclerAdapter<ChatMessage, MessageViewHolder> adapter;
     private RecyclerView listOfMessages;
     private EditText input;
-    private Button sendButton;
-    private Button buttonVideoLlamada;
     private FirebaseAuth mAuth;
     private DatabaseReference mDatabase;
     private String userRole = "Usuario";
+    private String userDisplayName = "";
+    private Map<String, String> userRolesMap = new HashMap<>();
+
+    // Solución para el error de Inconsistency detected
+    public static class SafeLinearLayoutManager extends LinearLayoutManager {
+        public SafeLinearLayoutManager(Context context) { super(context); }
+        @Override
+        public void onLayoutChildren(RecyclerView.Recycler recycler, RecyclerView.State state) {
+            try { super.onLayoutChildren(recycler, state); } catch (IndexOutOfBoundsException e) { Log.e(TAG, "Inconsistencia evitada"); }
+        }
+    }
 
     public static class MessageViewHolder extends RecyclerView.ViewHolder {
-        TextView messageText;
-        TextView messageUser;
-        Button deleteButton;
+        TextView txtMsg, txtUser;
+        Button btnDel;
 
         public MessageViewHolder(View v) {
             super(v);
-            messageText = v.findViewById(R.id.message_text);
-            messageUser = v.findViewById(R.id.message_user);
-            deleteButton = v.findViewById(R.id.delete_button);
+            txtMsg = v.findViewById(R.id.message_text);
+            txtUser = v.findViewById(R.id.message_user);
+            btnDel = v.findViewById(R.id.delete_button);
         }
     }
 
@@ -69,128 +79,106 @@ public class ChatActivity extends AppCompatActivity {
         
         listOfMessages = findViewById(R.id.list_of_messages);
         input = findViewById(R.id.input);
-        sendButton = findViewById(R.id.send_button);
-        buttonVideoLlamada = findViewById(R.id.buttonVideoLlamada);
+        FirebaseUser user = mAuth.getCurrentUser();
 
-        FirebaseUser currentUser = mAuth.getCurrentUser();
-        if (currentUser == null) {
-            Toast.makeText(this, "Debe iniciar sesión", Toast.LENGTH_SHORT).show();
-            finish();
-            return;
-        }
+        if (user == null) { finish(); return; }
 
-        // Forzar rol Admin por correo para asegurar el botón de borrar
-        if ("axelalejandro.flores26@gmail.com".equals(currentUser.getEmail())) {
-            userRole = "Admin";
-            Log.d(TAG, "Admin detectado por correo");
-        }
+        loadUserAndRoles(user);
 
-        checkUserRoleFromDB(currentUser.getUid());
-
-        sendButton.setOnClickListener(v -> {
-            String messageStr = input.getText().toString().trim();
-            if (!TextUtils.isEmpty(messageStr)) {
-                ChatMessage chatMessage = new ChatMessage(messageStr, currentUser.getEmail());
-                mDatabase.child("chats").push().setValue(chatMessage)
-                    .addOnSuccessListener(aVoid -> Log.d(TAG, "Mensaje guardado correctamente"))
-                    .addOnFailureListener(e -> Log.e(TAG, "Error al guardar mensaje", e));
+        findViewById(R.id.send_button).setOnClickListener(v -> {
+            String msg = input.getText().toString().trim();
+            if (!TextUtils.isEmpty(msg)) {
+                String sender = (userDisplayName != null && !userDisplayName.isEmpty()) ? userDisplayName : user.getEmail();
+                mDatabase.child("chats").push().setValue(new ChatMessage(msg, sender));
                 input.setText("");
             }
         });
 
-        buttonVideoLlamada.setOnClickListener(v -> {
-            if (checkPermissions()) {
-                startActivity(new Intent(ChatActivity.this, VideoLlamadaActivity.class));
-            } else {
-                requestPermissions();
-            }
+        findViewById(R.id.buttonVideoLlamada).setOnClickListener(v -> {
+            if (hasPerms()) startActivity(new Intent(this, VideoLlamadaActivity.class));
+            else reqPerms();
         });
 
-        displayChatMessages();
+        findViewById(R.id.buttonViewUsers).setOnClickListener(v -> {
+            startActivity(new Intent(this, UserListActivity.class));
+        });
+
+        setupChat();
     }
 
-    private void checkUserRoleFromDB(String userId) {
-        mDatabase.child("users").child(userId).child("role").addValueEventListener(new ValueEventListener() {
+    private void loadUserAndRoles(FirebaseUser user) {
+        mDatabase.child("users").addValueEventListener(new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot snapshot) {
-                if (snapshot.exists()) {
-                    userRole = snapshot.getValue(String.class);
-                    Log.d(TAG, "Rol actualizado desde DB: " + userRole);
-                    if (adapter != null) {
-                        adapter.notifyDataSetChanged();
+                userRolesMap.clear();
+                for (DataSnapshot ds : snapshot.getChildren()) {
+                    String username = ds.child("username").getValue(String.class);
+                    String role = ds.child("role").getValue(String.class);
+                    String name = (username != null && !username.isEmpty()) ? username : ds.child("email").getValue(String.class);
+                    if (name != null) userRolesMap.put(name, role != null ? role : "Usuario");
+                    if (ds.getKey() != null && ds.getKey().equals(user.getUid())) {
+                        userRole = role != null ? role : "Usuario";
+                        userDisplayName = name;
                     }
                 }
+                if (adapter != null) adapter.notifyDataSetChanged();
             }
-
             @Override
-            public void onCancelled(@NonNull DatabaseError error) {
-                Log.e(TAG, "Error al leer rol", error.toException());
-            }
+            public void onCancelled(@NonNull DatabaseError e) {}
         });
     }
 
-    private void displayChatMessages() {
-        Query query = mDatabase.child("chats");
-        FirebaseRecyclerOptions<ChatMessage> options =
-                new FirebaseRecyclerOptions.Builder<ChatMessage>()
-                        .setQuery(query, ChatMessage.class)
-                        .build();
+    private void setupChat() {
+        Query q = mDatabase.child("chats");
+        FirebaseRecyclerOptions<ChatMessage> opts = new FirebaseRecyclerOptions.Builder<ChatMessage>().setQuery(q, ChatMessage.class).build();
 
-        adapter = new FirebaseRecyclerAdapter<ChatMessage, MessageViewHolder>(options) {
+        adapter = new FirebaseRecyclerAdapter<ChatMessage, MessageViewHolder>(opts) {
             @NonNull
             @Override
-            public MessageViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-                View view = LayoutInflater.from(parent.getContext())
-                        .inflate(R.layout.message_item, parent, false);
-                return new MessageViewHolder(view);
+            public MessageViewHolder onCreateViewHolder(@NonNull ViewGroup p, int vt) {
+                return new MessageViewHolder(LayoutInflater.from(p.getContext()).inflate(R.layout.message_item, p, false));
             }
 
             @Override
-            protected void onBindViewHolder(@NonNull MessageViewHolder holder, int position, @NonNull ChatMessage model) {
-                Log.d(TAG, "Mostrando mensaje de: " + model.getMessageUser());
-                holder.messageText.setText(model.getMessageText());
-                holder.messageUser.setText(model.getMessageUser());
-
-                if ("Admin".equals(userRole)) {
-                    holder.deleteButton.setVisibility(View.VISIBLE);
-                    holder.deleteButton.setOnClickListener(v -> {
-                        getSnapshots().getSnapshot(holder.getAbsoluteAdapterPosition()).getRef().removeValue();
-                    });
-                } else {
-                    holder.deleteButton.setVisibility(View.GONE);
+            protected void onBindViewHolder(@NonNull MessageViewHolder h, int pos, @NonNull ChatMessage m) {
+                if (m.getMessageText() == null || m.getMessageUser() == null) {
+                    h.itemView.setVisibility(View.GONE);
+                    h.itemView.setLayoutParams(new RecyclerView.LayoutParams(0, 0));
+                    return;
                 }
+                h.itemView.setVisibility(View.VISIBLE);
+                h.itemView.setLayoutParams(new RecyclerView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+                h.txtMsg.setText(m.getMessageText());
+                h.txtUser.setText(m.getMessageUser());
+                
+                String senderName = m.getMessageUser();
+                String senderRole = userRolesMap.get(senderName);
+                if (senderRole == null) senderRole = "Usuario";
+
+                boolean canDelete = "Admin".equals(userRole) || ("Moderador".equals(userRole) && !"Admin".equals(senderRole)) || (userDisplayName != null && userDisplayName.equals(senderName));
+                h.btnDel.setVisibility(canDelete ? View.VISIBLE : View.GONE);
+                h.btnDel.setOnClickListener(v -> {
+                    int p = h.getBindingAdapterPosition();
+                    if (p != RecyclerView.NO_POSITION) getSnapshots().getSnapshot(p).getRef().removeValue();
+                });
             }
         };
 
-        LinearLayoutManager layoutManager = new LinearLayoutManager(this);
-        layoutManager.setStackFromEnd(true);
-        listOfMessages.setLayoutManager(layoutManager);
+        adapter.registerAdapterDataObserver(new RecyclerView.AdapterDataObserver() {
+            @Override
+            public void onItemRangeInserted(int start, int count) {
+                listOfMessages.smoothScrollToPosition(adapter.getItemCount());
+            }
+        });
+
+        listOfMessages.setLayoutManager(new SafeLinearLayoutManager(this));
         listOfMessages.setAdapter(adapter);
     }
 
-    private boolean checkPermissions() {
-        int cameraPermission = ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA);
-        int microphonePermission = ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO);
-        return cameraPermission == PackageManager.PERMISSION_GRANTED && microphonePermission == PackageManager.PERMISSION_GRANTED;
-    }
-
-    private void requestPermissions() {
-        ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO}, PERMISSION_REQUEST_CODE);
-    }
-
+    private boolean hasPerms() { return ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED && ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED; }
+    private void reqPerms() { ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO}, 100); }
     @Override
-    protected void onStart() {
-        super.onStart();
-        if (adapter != null) {
-            adapter.startListening();
-        }
-    }
-
+    protected void onStart() { super.onStart(); if (adapter != null) adapter.startListening(); }
     @Override
-    protected void onStop() {
-        super.onStop();
-        if (adapter != null) {
-            adapter.stopListening();
-        }
-    }
+    protected void onStop() { super.onStop(); if (adapter != null) adapter.stopListening(); }
 }

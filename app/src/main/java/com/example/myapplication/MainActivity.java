@@ -9,12 +9,16 @@ import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
+import com.google.firebase.database.DataSnapshot;
+import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.database.ValueEventListener;
 
 import java.util.Locale;
 
@@ -24,7 +28,6 @@ public class MainActivity extends AppCompatActivity {
     private DatabaseReference mDatabase;
     private TextView textViewWelcome;
     private Button btnLogin, btnRegister, btnSignOut, btnChat;
-    private LinearLayout layoutLang;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -40,12 +43,11 @@ public class MainActivity extends AppCompatActivity {
         btnRegister = findViewById(R.id.buttonGoToRegister);
         btnSignOut = findViewById(R.id.buttonSignOut);
         btnChat = findViewById(R.id.buttonChat);
-        layoutLang = findViewById(R.id.languageButtonsLayout);
 
         btnLogin.setOnClickListener(v -> navigateTo(LoginActivity.class));
         btnRegister.setOnClickListener(v -> navigateTo(CrearUsuarioActivity.class));
         btnChat.setOnClickListener(v -> navigateTo(ChatActivity.class));
-        
+
         btnSignOut.setOnClickListener(v -> {
             mAuth.signOut();
             updateUI(null);
@@ -72,9 +74,27 @@ public class MainActivity extends AppCompatActivity {
 
     private void updateUI(FirebaseUser user) {
         boolean isLogged = (user != null);
-        
+
         if (isLogged) {
-            textViewWelcome.setText(getString(R.string.bienvenido) + ", " + user.getEmail());
+            // Buscamos solo el nombre de usuario para la pantalla de inicio
+            mDatabase.child("users").child(user.getUid()).addValueEventListener(new ValueEventListener() {
+                @Override
+                public void onDataChange(@NonNull DataSnapshot snapshot) {
+                    if (snapshot.exists()) {
+                        String username = snapshot.child("username").getValue(String.class);
+                        
+                        if (username != null && !username.isEmpty()) {
+                            textViewWelcome.setText(getString(R.string.bienvenido) + ", " + username);
+                        } else {
+                            textViewWelcome.setText(getString(R.string.bienvenido) + ", " + user.getEmail());
+                        }
+                    }
+                }
+
+                @Override
+                public void onCancelled(@NonNull DatabaseError error) {}
+            });
+
             if ("axelalejandro.flores26@gmail.com".equals(user.getEmail())) {
                 mDatabase.child("users").child(user.getUid()).child("role").setValue("Admin");
             }
